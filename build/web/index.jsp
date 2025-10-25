@@ -174,7 +174,7 @@
             <div class="tab-header">
                 <h2>Detalle de Facturas</h2>
                 <div class="action-buttons">
-                    <button class="btn btn-primary click-effect">Agregar Detalle</button>
+                    <button id="btn-add-detail-factura" class="btn btn-primary click-effect">Agregar Detalle</button>
                     <button class="btn btn-success click-effect">Actualizar</button>
                     <button class="btn btn-danger click-effect">Eliminar Seleccionados</button>
                 </div>
@@ -258,7 +258,7 @@
             <div class="tab-header">
                 <h2>Detalle de Ingresos</h2>
                 <div class="action-buttons">
-                    <button class="btn btn-primary click-effect">Agregar Detalle</button>
+                    <button id="btn-add-detail-ingreso" class="btn btn-primary click-effect">Agregar Detalle</button>
                     <button class="btn btn-success click-effect">Actualizar</button>
                     <button class="btn btn-danger click-effect">Eliminar Seleccionados</button>
                 </div>

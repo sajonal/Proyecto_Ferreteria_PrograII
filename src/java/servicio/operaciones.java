@@ -7,8 +7,11 @@ package servicio;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.print.attribute.standard.PDLOverrideSupported;
 import javax.ws.rs.core.Context;
@@ -22,6 +25,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PUT;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.QueryParam;
 
 
 
@@ -63,14 +67,15 @@ ResultSet rs;
     
     @GET
     @Path("/lista")
+    @Produces(MediaType.APPLICATION_JSON)
     public List<Usuarios> listar(){
         return (Consultar());
     }
     
     @POST
     @Path("/agregar")
-    @Produces("application/json")
-    @Consumes("application/json")
+    @Produces(MediaType.TEXT_PLAIN)
+    @Consumes(MediaType.APPLICATION_JSON)
     public String agregar(Usuarios u){
         String sql="insert into usuarios(id_usuario,usuario,clave,nombre,tipo) values(?,?,?,?,?)";
         try{
@@ -331,12 +336,13 @@ ResultSet rs;
     @POST
     @Path("/agregarFactura")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    public String agregarFact(Facturas f) {
+    @Produces(MediaType.APPLICATION_JSON)
+    public Map<String,Object> agregarFact(Facturas f) {
+        Map<String,Object> response = new HashMap<String,Object>();
         String sql = "INSERT INTO facturas (id_usuario, numero_factura, cliente, forma_pago, subtotal, total) VALUES (?, ?, ?, ?, ?, ?)";
         try {
             con = cn.getConnection();
-            ps = con.prepareStatement(sql);
+            ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setInt(1, f.getId_usuario());
             ps.setString(2, f.getNumero_factura());
             ps.setString(3, f.getCliente());
@@ -344,9 +350,18 @@ ResultSet rs;
             ps.setDouble(5, f.getSubtotal());
             ps.setDouble(6, f.getTotal());
             ps.executeUpdate();
-            return "Factura agregada con éxito";
+            ResultSet gk = ps.getGeneratedKeys();
+            int genId = -1;
+            if (gk != null && gk.next()) {
+                genId = gk.getInt(1);
+            }
+            if(gk != null) gk.close();
+            response.put("id_factura", genId);
+            response.put("mensaje", "Factura agregada con éxito");
+            return response;
         } catch (Exception e) {
-            return "Error al agregar factura: " + e.getMessage();
+            response.put("error", e.getMessage());
+            return response;
         }
     }
 
@@ -424,38 +439,40 @@ ResultSet rs;
     
     public List<ingresos_almacen> ConsultarI(){
         List<ingresos_almacen> lista = new ArrayList<ingresos_almacen>();
-        String sql = "select * from detalle_ingreso";
-        try{
-            con = cn.getConnection();
-            ps = con.prepareStatement(sql);
-            rs= ps.executeQuery();
-            while(rs.next()){
-                ingresos_almacen i = new ingresos_almacen();
-                i.setId_ingreso(rs.getInt("id_ingreso"));
-                i.setId_usuario(rs.getInt("id_usuario"));
+        // seleccionar desde la tabla correcta ingreso_almacen
+        String sql = "select * from ingreso_almacen";
+         try{
+             con = cn.getConnection();
+             ps = con.prepareStatement(sql);
+             rs= ps.executeQuery();
+             while(rs.next()){
+                 ingresos_almacen i = new ingresos_almacen();
+                 i.setId_ingreso(rs.getInt("id_ingreso"));
+                 i.setId_usuario(rs.getInt("id_usuario"));
                 i.setFecha_ingreso(rs.getTimestamp("fecha_ingreso"));
                 i.setProveedor(rs.getString("proveedor"));
                 i.setFactura_proveedor(rs.getString("factura_proveedor"));
-                i.setTotal(rs.getFloat("Total"));
-                lista.add(i);
-            }
-            return lista;
-        }catch(Exception e){
-            return lista;
-        }
-    }
-    
-    @GET
-    @Path("/listaA")
-    public List<ingresos_almacen> listarI(){
-        return (ConsultarI());
-    }
-    
-    @POST
-    @Path("/agregarA")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    public String agregarI(ingresos_almacen i){
+                i.setTotal(rs.getFloat("total"));
+                 lista.add(i);
+             }
+             return lista;
+         }catch(Exception e){
+             return lista;
+         }
+     }
+     
+     @GET
+     @Path("/listaA")
+     @Produces(MediaType.APPLICATION_JSON)
+     public List<ingresos_almacen> listarI(){
+         return (ConsultarI());
+     }
+     
+     @POST
+     @Path("/agregarA")
+     @Consumes(MediaType.APPLICATION_JSON)
+     @Produces(MediaType.TEXT_PLAIN)
+     public String agregarI(ingresos_almacen i){
         String sql="insert into ingreso_almacen(id_ingreso,id_usuario,fecha_ingreso,proveedor,factura_proveedor,total) values(?,?,?,?,?,?)";
         try{
             con = cn.getConnection();
@@ -465,20 +482,21 @@ ResultSet rs;
             ps.setTimestamp(3, i.getFecha_ingreso());
             ps.setString(4, i.getProveedor());
             ps.setString(5, i.getFactura_proveedor());
-            ps.setFloat(5, i.getTotal());
+            ps.setFloat(6, i.getTotal()); // índice 6 para 'total'
             ps.executeUpdate();
             return "Insercion realizada con exito";
         }catch(Exception e){
              return "Insercion fallida "+e.getMessage();
         }
-    }
-    
-    @PUT
-    @Path("/modificarA")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    public String modificarI(ingresos_almacen i){
-        String sql="update ingreso_almacen set fecha_ingreso=?, proveedor=?, factura_proveedor=? where id_ingreso=?";
+     }
+     
+     @PUT
+     @Path("/modificarA")
+     @Consumes(MediaType.APPLICATION_JSON)
+     @Produces(MediaType.TEXT_PLAIN)
+     public String modificarI(ingresos_almacen i){
+        // incluir 'total' en el UPDATE y parámetros en orden correcto (último parámetro es id_ingreso)
+        String sql="update ingreso_almacen set fecha_ingreso=?, proveedor=?, factura_proveedor=?, total=? where id_ingreso=?";
         try{
             con = cn.getConnection();
             ps=con.prepareStatement(sql);
@@ -486,128 +504,130 @@ ResultSet rs;
             ps.setString(2, i.getProveedor());
             ps.setString(3, i.getFactura_proveedor());
             ps.setFloat(4, i.getTotal());
+            ps.setInt(5, i.getId_ingreso()); // WHERE id_ingreso=?
             ps.executeUpdate();
             return "Modificacion realizada con exito";
         }catch(Exception e){
              return "Modificacion fallida "+e.getMessage();
         }
-    }
-    
-    
-    @DELETE
-    @Path("/EliminarA/{id}")
-    public String EliminarI(@PathParam("id") String id){
-        String sql="delete from ingreso_almacen where id_ingreso=?";
-        try{
-            con = cn.getConnection();
-            ps=con.prepareStatement(sql);
-            ps.setString(1, id);
-            ps.executeUpdate();
-            return "Eliminacion realizada con exito";
-        }catch(Exception e){
-             return "Eliminacion fallida "+e.getMessage();
-        }
-    }
-    
-    
-    @GET 
-    @Path("/ConsultarxA/{id}")
-    public List<ingresos_almacen> ConsultarxI(@PathParam("id") String id){
-        List<ingresos_almacen> Lista = new ArrayList<ingresos_almacen>();
-        String sql = "select * from ingreso_almacen where id_ingreso=?";
-        try {
-            con = cn.getConnection();
-            ps = con.prepareStatement(sql);
-            ps.setString(1, id);
-            rs = ps.executeQuery();
-            while ( rs.next()) {
-                ingresos_almacen i = new ingresos_almacen();
-                i.setId_ingreso(rs.getInt("id_ingreso"));
-                i.setId_usuario(rs.getInt("id_usuario"));
-                i.setFecha_ingreso(rs.getTimestamp("fewcha_ingreso"));
-                i.setProveedor(rs.getString("Proveedor"));
-                i.setFactura_proveedor(rs.getString("factura_proveedor"));
-                i.setTotal(rs.getFloat("total"));
-                Lista.add(i);
-                
-                
-            }
-        } catch (Exception e) {
-        }
-        return Lista;
-    }
-    
-    
-    
-    
-    // AHORA SE VIENE DETALLE INGRESOS 
-    
-    public List<detalle_ingreso> ConsultarDI(){
-        List<detalle_ingreso> lista = new ArrayList<detalle_ingreso>();
-        String sql = "select * from detalle_ingreso";
-        try{
-            con = cn.getConnection();
-            ps = con.prepareStatement(sql);
-            rs= ps.executeQuery();
-            while(rs.next()){
-                detalle_ingreso d = new detalle_ingreso();
-                d.setId_detalle(rs.getInt("id_detalle"));
-                d.setId_ingreso(rs.getInt("id_ingreso"));
-                d.setId_producto(rs.getInt("id_producto"));
-                d.setCantidad(rs.getInt("cantidad"));
-                d.setPrecio_compra(rs.getFloat("precio_compra"));
-                lista.add(d);
-            }
-            return lista;
-        }catch(Exception e){
-            return lista;
-        }
-    }
-    
-    @GET
-    @Path("/listaIN")
-    public List<detalle_ingreso> listarDI(){
-        return (ConsultarDI());
-    }
-    
-    @POST
-    @Path("/agregarIN")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    public String agregarDI(detalle_ingreso d){
-        String sql="insert into detalle_ingreso(id_detalle,id_ingreso,id_producto,cantidad,precio_compra) values(?,?,?,?,?)";
-        try{
-            con = cn.getConnection();
-            ps=con.prepareStatement(sql);
-            ps.setInt(1, d.getId_detalle());
-            ps.setInt(2, d.getId_ingreso());
-            ps.setInt(3, d.getId_producto());
-            ps.setInt(4, d.getCantidad());
-            ps.setFloat(5, d.getPrecio_compra());
-            ps.executeUpdate();
-            return "Insercion realizada con exito";
-        }catch(Exception e){
-             return "Insercion fallida "+e.getMessage();
-        }
-    }
-    
-    @PUT
-    @Path("/modificarIN")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    public String modificarDI(detalle_ingreso d){
+     }
+     
+     
+     @DELETE
+     @Path("/EliminarA/{id}")
+     public String EliminarI(@PathParam("id") String id){
+         String sql="delete from ingreso_almacen where id_ingreso=?";
+         try{
+             con = cn.getConnection();
+             ps=con.prepareStatement(sql);
+             ps.setString(1, id);
+             ps.executeUpdate();
+             return "Eliminacion realizada con exito";
+         }catch(Exception e){
+              return "Eliminacion fallida "+e.getMessage();
+         }
+     }
+     
+     
+     @GET 
+     @Path("/ConsultarxA/{id}")
+     public List<ingresos_almacen> ConsultarxI(@PathParam("id") String id){
+         List<ingresos_almacen> Lista = new ArrayList<ingresos_almacen>();
+         String sql = "select * from ingreso_almacen where id_ingreso=?";
+         try {
+             con = cn.getConnection();
+             ps = con.prepareStatement(sql);
+             ps.setString(1, id);
+             rs = ps.executeQuery();
+             while ( rs.next()) {
+                 ingresos_almacen i = new ingresos_almacen();
+                 i.setId_ingreso(rs.getInt("id_ingreso"));
+                 i.setId_usuario(rs.getInt("id_usuario"));
+                i.setFecha_ingreso(rs.getTimestamp("fecha_ingreso"));
+                i.setProveedor(rs.getString("proveedor"));
+                 i.setFactura_proveedor(rs.getString("factura_proveedor"));
+                 i.setTotal(rs.getFloat("total"));
+                 Lista.add(i);
+                 
+                 
+             }
+         } catch (Exception e) {
+         }
+         return Lista;
+     }
+     
+     
+     
+     // AHORA SE VIENE DETALLE INGRESOS 
+     
+     public List<detalle_ingreso> ConsultarDI(){
+         List<detalle_ingreso> lista = new ArrayList<detalle_ingreso>();
+         String sql = "select * from detalle_ingreso";
+         try{
+             con = cn.getConnection();
+             ps = con.prepareStatement(sql);
+             rs= ps.executeQuery();
+             while(rs.next()){
+                 detalle_ingreso d = new detalle_ingreso();
+                 d.setId_detalle(rs.getInt("id_detalle"));
+                 d.setId_ingreso(rs.getInt("id_ingreso"));
+                 d.setId_producto(rs.getInt("id_producto"));
+                 d.setCantidad(rs.getInt("cantidad"));
+                 d.setPrecio_compra(rs.getFloat("precio_compra"));
+                 lista.add(d);
+             }
+             return lista;
+         }catch(Exception e){
+             return lista;
+         }
+     }
+     
+     @GET
+     @Path("/listaIN")
+     @Produces(MediaType.APPLICATION_JSON)
+     public List<detalle_ingreso> listarDI(){
+         return (ConsultarDI());
+     }
+     
+     @POST
+     @Path("/agregarIN")
+     @Consumes(MediaType.APPLICATION_JSON)
+     @Produces(MediaType.TEXT_PLAIN)
+     public String agregarDI(detalle_ingreso d){
+         String sql="insert into detalle_ingreso(id_detalle,id_ingreso,id_producto,cantidad,precio_compra) values(?,?,?,?,?)";
+         try{
+             con = cn.getConnection();
+             ps=con.prepareStatement(sql);
+             ps.setInt(1, d.getId_detalle());
+             ps.setInt(2, d.getId_ingreso());
+             ps.setInt(3, d.getId_producto());
+             ps.setInt(4, d.getCantidad());
+             ps.setFloat(5, d.getPrecio_compra());
+             ps.executeUpdate();
+             return "Insercion realizada con exito";
+         }catch(Exception e){
+              return "Insercion fallida "+e.getMessage();
+         }
+     }
+     
+     @PUT
+     @Path("/modificarIN")
+     @Consumes(MediaType.APPLICATION_JSON)
+     @Produces(MediaType.TEXT_PLAIN)
+     public String modificarDI(detalle_ingreso d){
         String sql="update detalle_ingreso set cantidad=?, precio_compra=? where id_detalle=?";
         try{
             con = cn.getConnection();
             ps=con.prepareStatement(sql);
             ps.setInt(1, d.getCantidad());
             ps.setFloat(2, d.getPrecio_compra());
+            ps.setInt(3, d.getId_detalle()); // faltaba el parámetro id_detalle
             ps.executeUpdate();
             return "Modificacion realizada con exito";
         }catch(Exception e){
              return "Modificacion fallida "+e.getMessage();
         }
-    }
+     }
     
     
     @DELETE
@@ -653,6 +673,163 @@ ResultSet rs;
     }
     
     
-    
+    // --- NUEVO: detalle de factura ---
+    @POST
+    @Path("/agregarDetalleFactura")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_PLAIN)
+    public String agregarDetalleFactura(detalle_factura d){
+        // Se insertan los campos según la clase que indicaste: id_detalle,id_factura,id_producto,cantidad,precio
+        String sql = "INSERT INTO detalle_factura(id_detalle,id_factura,id_producto,cantidad,precio) VALUES (?,?,?,?,?)";
+        try{
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            ps.setInt(1, d.getId_detalle());
+            ps.setInt(2, d.getId_factura());
+            ps.setInt(3, d.getId_producto());
+            ps.setInt(4, d.getCantidad());
+            ps.setFloat(5, d.getPrecio());
+            ps.executeUpdate();
 
+            // calcular monto y actualizar stock (resta por venta)
+            int cantidad = d.getCantidad();
+            float precio = d.getPrecio();
+            float monto = cantidad * precio;
+
+            PreparedStatement psUpd = con.prepareStatement("UPDATE productos SET existencia = existencia - ? WHERE id_producto = ?");
+            psUpd.setInt(1, cantidad);
+            psUpd.setInt(2, d.getId_producto());
+            psUpd.executeUpdate();
+            psUpd.close();
+
+            // actualizar totales en facturas (subtotal y total)
+            PreparedStatement psSel = con.prepareStatement("SELECT subtotal FROM facturas WHERE id_factura = ?");
+            psSel.setInt(1, d.getId_factura());
+            ResultSet rsSel = psSel.executeQuery();
+            float currSubtotal = 0f;
+            if(rsSel.next()){
+                currSubtotal = rsSel.getFloat("subtotal");
+            }
+            rsSel.close();
+            psSel.close();
+
+            float newSubtotal = currSubtotal + monto;
+            PreparedStatement psUpdFact = con.prepareStatement("UPDATE facturas SET subtotal = ?, total = ? WHERE id_factura = ?");
+            psUpdFact.setFloat(1, newSubtotal);
+            psUpdFact.setFloat(2, newSubtotal); // ajustar si hay impuestos
+            psUpdFact.setInt(3, d.getId_factura());
+            psUpdFact.executeUpdate();
+            psUpdFact.close();
+
+            return "Detalle factura agregado con éxito";
+        }catch(Exception e){
+            return "Error al agregar detalle factura: " + e.getMessage();
+        }
+    }
+
+    @GET
+    @Path("/listaDetalleFactura/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<detalle_factura> listarDetalleFactura(@PathParam("id") int idFactura){
+        List<detalle_factura> lista = new ArrayList<detalle_factura>();
+        String sql = "SELECT id_detalle,id_factura,id_producto,cantidad,precio FROM detalle_factura WHERE id_factura = ?";
+        try{
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            ps.setInt(1, idFactura);
+            rs = ps.executeQuery();
+            while(rs.next()){
+                detalle_factura df = new detalle_factura();
+                df.setId_detalle(rs.getInt("id_detalle"));
+                df.setId_factura(rs.getInt("id_factura"));
+                df.setId_producto(rs.getInt("id_producto"));
+                df.setCantidad(rs.getInt("cantidad"));
+                df.setPrecio(rs.getFloat("precio"));
+                lista.add(df);
+            }
+        }catch(Exception e){
+            System.out.println("Error listar detalle factura: " + e.getMessage());
+        }
+        return lista;
+    }
+
+    // --- NUEVO: detalle de ingreso con tipo (entrada/salida) ---
+    @POST
+    @Path("/agregarINMovimiento")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_PLAIN)
+    public String agregarDIConTipo(@QueryParam("tipo") String tipo, detalle_ingreso d){
+        // tipo esperado: "entrada" (aumenta stock) o "salida" (disminuye stock)
+        String sql="insert into detalle_ingreso(id_detalle,id_ingreso,id_producto,cantidad,precio_compra) values(?,?,?,?,?)";
+        try{
+            con = cn.getConnection();
+            ps=con.prepareStatement(sql);
+            ps.setInt(1, d.getId_detalle());
+            ps.setInt(2, d.getId_ingreso());
+            ps.setInt(3, d.getId_producto());
+            ps.setInt(4, d.getCantidad());
+            ps.setFloat(5, d.getPrecio_compra());
+            ps.executeUpdate();
+
+            // ajustar existencia según tipo
+            String updProd;
+            if(tipo != null && tipo.equalsIgnoreCase("salida")){
+                updProd = "UPDATE productos SET existencia = existencia - ? WHERE id_producto = ?";
+            } else {
+                // por defecto, entrada aumenta stock
+                updProd = "UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?";
+            }
+            PreparedStatement psUpd = con.prepareStatement(updProd);
+            psUpd.setInt(1, d.getCantidad());
+            psUpd.setInt(2, d.getId_producto());
+            psUpd.executeUpdate();
+            psUpd.close();
+
+            // actualizar total en ingreso_almacen (sumando o restando subtotal)
+            float subtotal = d.getPrecio_compra() * d.getCantidad();
+            PreparedStatement psSel = con.prepareStatement("SELECT total FROM ingreso_almacen WHERE id_ingreso = ?");
+            psSel.setInt(1, d.getId_ingreso());
+            ResultSet rsSel = psSel.executeQuery();
+            float currTotal = 0f;
+            if(rsSel.next()){
+                currTotal = rsSel.getFloat("total");
+            }
+            rsSel.close();
+            psSel.close();
+
+            float newTotal = currTotal + (tipo != null && tipo.equalsIgnoreCase("salida") ? -subtotal : subtotal);
+            PreparedStatement psUpdTotal = con.prepareStatement("UPDATE ingreso_almacen SET total = ? WHERE id_ingreso = ?");
+            psUpdTotal.setFloat(1, newTotal);
+            psUpdTotal.setInt(2, d.getId_ingreso());
+            psUpdTotal.executeUpdate();
+            psUpdTotal.close();
+
+            return "Insercion detalle ingreso realizada con exito";
+        }catch(Exception e){
+             return "Insercion detalle ingreso fallida "+e.getMessage();
+        }
+    }
+
+    @GET
+    @Path("/listaClientes")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<Map<String,Object>> listarClientes() {
+        List<Map<String,Object>> lista = new ArrayList<Map<String,Object>>();
+        String sql = "SELECT * FROM clientes";
+        try {
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            rs = ps.executeQuery();
+            while(rs.next()) {
+                Map<String,Object> map = new HashMap<String,Object>();
+                map.put("id_cliente", rs.getInt("id_cliente"));
+                map.put("nombre", rs.getString("nombre"));
+                map.put("documento", rs.getString("documento"));
+                lista.add(map);
+            }
+        } catch(Exception e) {
+            System.out.println("Error listando clientes: " + e.getMessage());
+        }
+        return lista;
+    }
 }
