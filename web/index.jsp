@@ -193,20 +193,8 @@
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td><input type="checkbox" class="row-select"></td>
-                            <td>DF-001</td>
-                            <td>F-001</td>
-                            <td>Martillo</td>
-                            <td>2</td>
-                            <td>$15.00</td>
-                            <td>$30.00</td>
-                            <td>
-                                <button class="btn btn-success click-effect">Actualizar</button>
-                                <button class="btn btn-danger click-effect">Eliminar</button>
-                            </td>
-                        </tr>
+                    <tbody id="detalles-factura-tbody">
+                        <!-- Datos renderizados dinámicamente -->
                     </tbody>
                 </table>
             </div>
@@ -231,23 +219,12 @@
                             <th>Fecha</th>
                             <th>Proveedor</th>
                             <th>Total</th>
-                            <th>Estado</th>
+                            <th>Factura Proveedor</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="ingresos-tbody">
-                        <tr>
-                            <td><input type="checkbox" class="row-select"></td>
-                            <td>I-001</td>
-                            <td>01/12/2023</td>
-                            <td>Proveedor A</td>
-                            <td>$500.00</td>
-                            <td>Recibido</td>
-                            <td>
-                                <button class="btn btn-success click-effect">Actualizar</button>
-                                <button class="btn btn-danger click-effect">Eliminar</button>
-                            </td>
-                        </tr>
+                        <!-- Datos renderizados dinámicamente -->
                     </tbody>
                 </table>
             </div>
@@ -272,25 +249,13 @@
                             <th>N° Ingreso</th>
                             <th>Producto</th>
                             <th>Cantidad</th>
-                            <th>Costo Unitario</th>
+                            <th>Precio Compra</th>
                             <th>Subtotal</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td><input type="checkbox" class="row-select"></td>
-                            <td>DI-001</td>
-                            <td>I-001</td>
-                            <td>Martillo</td>
-                            <td>10</td>
-                            <td>$12.00</td>
-                            <td>$120.00</td>
-                            <td>
-                                <button class="btn btn-success click-effect">Actualizar</button>
-                                <button class="btn btn-danger click-effect">Eliminar</button>
-                            </td>
-                        </tr>
+                    <tbody id="detalles-ingreso-tbody">
+                        <!-- Datos renderizados dinámicamente -->
                     </tbody>
                 </table>
             </div>

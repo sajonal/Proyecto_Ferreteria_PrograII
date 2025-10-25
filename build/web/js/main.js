@@ -251,12 +251,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 + '<td>' + (f.forma_pago || '') + '</td>'
                 + '<td>'
                 + '<button class="btn btn-primary btn-add-detail" data-id="'+(f.id_factura||'')+'">Agregar Detalle</button> '
+                + '<button class="btn btn-info btn-view-detail" data-id="'+(f.id_factura||'')+'">Ver Detalles</button> '
                 + '<button class="btn btn-danger btn-delete-fact" data-id="'+(f.id_factura||'')+'">Eliminar</button>'
                 + '</td>';
             tbody.appendChild(tr);
         });
 
         // Wire up buttons
+        tbody.querySelectorAll('.btn-view-detail').forEach(function(b){
+            b.addEventListener('click', function(){
+                var id = this.getAttribute('data-id');
+                if(id) {
+                    switchTab('detalle-factura');
+                    loadDetalleFactura(parseInt(id));
+                }
+            });
+        });
+
         tbody.querySelectorAll('.btn-add-detail').forEach(function(b){
             b.addEventListener('click', function(){
                 var id = this.getAttribute('data-id');
@@ -278,6 +289,134 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    }
+
+    function renderIngresos(ingresos) {
+        var tbody = document.getElementById('ingresos-tbody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        ingresos.forEach(function(i){
+            var tr = document.createElement('tr');
+            tr.innerHTML = ''
+                + '<td><input type="checkbox" class="row-select"></td>'
+                + '<td>' + (i.id_ingreso || '') + '</td>'
+                + '<td>' + (i.fecha_ingreso ? new Date(i.fecha_ingreso).toLocaleString() : '') + '</td>'
+                + '<td>' + (i.proveedor || '') + '</td>'
+                + '<td>$' + (i.total || 0).toFixed(2) + '</td>'
+                + '<td>' + (i.factura_proveedor || '') + '</td>'
+                + '<td>'
+                + '<button class="btn btn-primary btn-add-detail-to" data-id="'+(i.id_ingreso||'')+'">Agregar Detalle</button> '
+                + '<button class="btn btn-info btn-view-detail-ing" data-id="'+(i.id_ingreso||'')+'">Ver Detalles</button> '
+                + '<button class="btn btn-danger btn-delete-ingreso" data-id="'+(i.id_ingreso||'')+'">Eliminar</button>'
+                + '</td>';
+            tbody.appendChild(tr);
+        });
+
+        // Wire up new view details button
+        tbody.querySelectorAll('.btn-view-detail-ing').forEach(function(b){
+            b.addEventListener('click', function(){
+                var id = this.getAttribute('data-id');
+                if(id) {
+                    switchTab('detalle-ingreso');
+                    loadDetalleIngreso(parseInt(id));
+                }
+            });
+        });
+
+        // Wire up delete buttons
+        tbody.querySelectorAll('.btn-delete-ingreso').forEach(function(b){
+            b.addEventListener('click', function(){
+                var id = this.getAttribute('data-id');
+                if(!id) return;
+                if(confirm('¿Eliminar ingreso #' + id + '?')) {
+                    deleteReq(apiBase + 'EliminarA/' + id)
+                        .then(function(res){
+                            alert(res);
+                            fetchIngresos();
+                        })
+                        .catch(function(err){ alert('Error: ' + err.message); });
+                }
+            });
+        });
+
+        // Wire up "Agregar Detalle" buttons
+        tbody.querySelectorAll('.btn-add-detail-to').forEach(function(b){
+            b.addEventListener('click', function(){
+                var id = this.getAttribute('data-id');
+                if(id) addDetalleToIngreso(parseInt(id));
+            });
+        });
+    }
+
+    // Funciones para cargar detalles específicos
+    function loadDetalleFactura(idFactura) {
+        fetchJson(apiBase + 'listaDetalleFactura/' + idFactura)
+            .then(function(detalles){
+                var tbody = document.getElementById('detalle-factura').querySelector('tbody');
+                if(!tbody) return;
+                
+                tbody.innerHTML = '';
+                detalles.forEach(function(d){
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = ''
+                        + '<td><input type="checkbox" class="row-select"></td>'
+                        + '<td>' + (d.id_detalle || '') + '</td>'
+                        + '<td>' + (d.id_factura || '') + '</td>'
+                        + '<td>' + (d.id_producto || '') + '</td>'
+                        + '<td>' + (d.cantidad || 0) + '</td>'
+                        + '<td>$' + (d.precio || 0).toFixed(2) + '</td>'
+                        + '<td>$' + ((d.cantidad * d.precio) || 0).toFixed(2) + '</td>'
+                        + '<td>'
+                        + '<button class="btn btn-danger btn-delete-detalle" data-id="'+(d.id_detalle||'')+'">Eliminar</button>'
+                        + '</td>';
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(function(err){ console.error('Error cargando detalles de factura:', err); });
+    }
+
+    function loadDetalleIngreso(idIngreso) {
+        fetchJson(apiBase + 'ConsultarxIN/' + idIngreso)
+            .then(function(detalles){
+                var tbody = document.getElementById('detalles-ingreso-tbody');
+                if(!tbody) return;
+                
+                tbody.innerHTML = '';
+                detalles.forEach(function(d){
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = ''
+                        + '<td><input type="checkbox" class="row-select"></td>'
+                        + '<td>' + (d.id_detalle || '') + '</td>'
+                        + '<td>' + (d.id_ingreso || '') + '</td>'
+                        + '<td>' + (d.id_producto || '') + '</td>'
+                        + '<td>' + (d.cantidad || 0) + '</td>'
+                        + '<td>$' + (d.precio_compra || 0).toFixed(2) + '</td>'
+                        + '<td>$' + ((d.cantidad * d.precio_compra) || 0).toFixed(2) + '</td>'
+                        + '<td>'
+                        + '<button class="btn btn-danger btn-delete-detalle" data-id="'+(d.id_detalle||'')+'">Eliminar</button>'
+                        + '</td>';
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(function(err){ console.error('Error cargando detalles de ingreso:', err); });
+    }
+
+    // Función para cargar detalles de un ingreso específico
+    function fetchDetallesIngreso(idIngreso) {
+        var url = apiBase + 'listaIN';
+        if(idIngreso) {
+            url = apiBase + 'ConsultarxIN/' + idIngreso;
+        }
+        
+        fetchJson(url)
+            .then(function(data){
+                var arr = data;
+                if (typeof data === 'string') {
+                    try { arr = JSON.parse(data); } catch(e) { arr = []; }
+                }
+                renderDetallesIngreso(arr || []);
+            })
+            .catch(function(err){ console.error('Error cargando detalles:', err); });
     }
 
     function fetchUsers() {
@@ -459,6 +598,92 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Agregar ingreso almacén
+    var addIngresoBtn = document.getElementById('btn-add-ingreso');
+    if(addIngresoBtn){
+        addIngresoBtn.addEventListener('click', function(){
+            var proveedor = prompt('Proveedor:');
+            if(proveedor===null) return;
+            var factura_prov = prompt('Número factura proveedor:');
+            if(factura_prov===null) return;
+            var payload = { id_ingreso: 0, id_usuario: 1, fecha_ingreso: null, proveedor: proveedor, factura_proveedor: factura_prov, total: 0 };
+            postJson(apiBase + 'agregarA', payload)
+                .then(function(res){
+                    console.log('Respuesta agregarA:', res); // Debug
+                    if(res.error) {
+                        throw new Error(res.error);
+                    }
+                    if(!res.id_ingreso) {
+                        throw new Error('No se recibió ID del ingreso');
+                    }
+                    alert(res.mensaje || 'Ingreso creado con éxito');
+                    addDetalleToIngreso(res.id_ingreso);
+                    fetchIngresos();
+                })
+                .catch(function(err){ 
+                    console.error('Error al crear ingreso:', err); // Debug
+                    alert('Error al crear ingreso: ' + err.message); 
+                });
+        });
+    }
+
+    // Agregar detalle a ingreso: usa endpoint agregarINMovimiento?tipo=
+    function addDetalleToIngreso(id_ingreso){
+        if(!id_ingreso || isNaN(parseInt(id_ingreso)) || parseInt(id_ingreso) <= 0) {
+            console.error('ID ingreso inválido:', id_ingreso);
+            alert('Error: ID de ingreso inválido');
+            return;
+        }
+        
+        fetchJson(apiBase + 'listaProductos').then(function(productos){
+            showModalSelect('Seleccionar Producto para Ingreso', productos || [],
+                function(p){ return p.nombre + ' (código: ' + p.codigo + ')'; },
+                function(producto){
+                    var qty = parseInt(prompt('Cantidad a ingresar:'));
+                    if(isNaN(qty) || qty <= 0){ alert('Cantidad inválida'); return; }
+                    
+                    var precio_compra = parseFloat(prompt('Precio de compra por unidad:'));
+                    if(isNaN(precio_compra) || precio_compra < 0){ alert('Precio inválido'); return; }
+                    
+                    console.log('Enviando detalle para ingreso:', id_ingreso); // Debug
+                    
+                    var payload = {
+                        id_detalle: 0, // La BD lo generará
+                        id_ingreso: parseInt(id_ingreso),
+                        id_producto: producto.id_producto,
+                        cantidad: qty,
+                        precio_compra: precio_compra
+                    };
+
+                    postJson(apiBase + 'agregarINMovimiento', payload)
+                        .then(function(res){
+                            console.log('Respuesta agregarINMovimiento:', res); // Debug
+                            alert(res);
+                            fetchIngresos();
+                            fetchProducts();
+                            if(confirm('¿Agregar otro producto al ingreso #' + id_ingreso + '?')){
+                                addDetalleToIngreso(id_ingreso);
+                            }
+                        })
+                        .catch(function(err){ 
+                            console.error('Error en agregarINMovimiento:', err); // Debug
+                            alert('Error: ' + err.message); 
+                        });
+                }
+            );
+        }).catch(function(err){ alert('Error al cargar productos: ' + err.message); });
+    }
+
+    // Wire botón "Agregar Detalle" en Detalle Ingreso (permite indicar id_ingreso manualmente)
+    var addDetailIngBtn = document.getElementById('btn-add-detail-ingreso');
+    if(addDetailIngBtn){
+        addDetailIngBtn.addEventListener('click', function(){
+            var idIngreso = prompt('ID del ingreso al que agregar detalles:');
+            if(!idIngreso) return;
+            addDetalleToIngreso(parseInt(idIngreso));
+        });
+    }
+
     // Funciones auxiliares para mostrar selector de productos/clientes
     function showModalSelect(title, items, renderFn, onSelect) {
         // Crear modal
@@ -510,7 +735,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
      // Inicializar primera pestaña y cargar datos si corresponde
      initFirstTab();
-     // Si la primera tab ya activa es usuarios o productos, fetches ya se invocarán porque switchTab fue sobrescrita
 
-     // ...existing code...
  });

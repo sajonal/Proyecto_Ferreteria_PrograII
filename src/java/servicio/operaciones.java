@@ -440,7 +440,7 @@ ResultSet rs;
     public List<ingresos_almacen> ConsultarI(){
         List<ingresos_almacen> lista = new ArrayList<ingresos_almacen>();
         // seleccionar desde la tabla correcta ingreso_almacen
-        String sql = "select * from ingreso_almacen";
+        String sql = "select * from ingresos_almacen";
          try{
              con = cn.getConnection();
              ps = con.prepareStatement(sql);
@@ -471,32 +471,50 @@ ResultSet rs;
      @POST
      @Path("/agregarA")
      @Consumes(MediaType.APPLICATION_JSON)
-     @Produces(MediaType.TEXT_PLAIN)
-     public String agregarI(ingresos_almacen i){
-        String sql="insert into ingreso_almacen(id_ingreso,id_usuario,fecha_ingreso,proveedor,factura_proveedor,total) values(?,?,?,?,?,?)";
+     @Produces(MediaType.APPLICATION_JSON)
+     public Map<String,Object> agregarI(ingresos_almacen i){
+        Map<String,Object> resp = new HashMap<String,Object>();
+        String sql="INSERT INTO ingresos_almacen (id_usuario, proveedor, factura_proveedor, total) VALUES (?, ?, ?, 0)";
         try{
             con = cn.getConnection();
-            ps=con.prepareStatement(sql);
-            ps.setInt(1, i.getId_ingreso());
-            ps.setInt(2, i.getId_usuario());
-            ps.setTimestamp(3, i.getFecha_ingreso());
-            ps.setString(4, i.getProveedor());
-            ps.setString(5, i.getFactura_proveedor());
-            ps.setFloat(6, i.getTotal()); // índice 6 para 'total'
-            ps.executeUpdate();
-            return "Insercion realizada con exito";
+            // Crear el ingreso y obtener ID
+            ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setInt(1, i.getId_usuario());
+            ps.setString(2, i.getProveedor());
+            ps.setString(3, i.getFactura_proveedor());
+            
+            int affectedRows = ps.executeUpdate();
+            if (affectedRows == 0) {
+                throw new Exception("No se pudo crear el ingreso");
+            }
+
+            ResultSet gk = ps.getGeneratedKeys();
+            int genId = -1;
+            if (gk.next()) {
+                genId = gk.getInt(1);
+                System.out.println("ID generado para ingreso: " + genId); // Debug
+            } else {
+                throw new Exception("No se pudo obtener el ID generado");
+            }
+            gk.close();
+            
+            resp.put("id_ingreso", genId);
+            resp.put("mensaje", "Ingreso #" + genId + " creado con éxito");
+            return resp;
         }catch(Exception e){
-             return "Insercion fallida "+e.getMessage();
+            System.out.println("Error en agregarI: " + e.getMessage()); // Debug
+            resp.put("error", e.getMessage());
+            return resp;
         }
-     }
-     
+    }
+    
      @PUT
-     @Path("/modificarA")
-     @Consumes(MediaType.APPLICATION_JSON)
-     @Produces(MediaType.TEXT_PLAIN)
-     public String modificarI(ingresos_almacen i){
+    @Path("/modificarA")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_PLAIN)
+    public String modificarI(ingresos_almacen i){
         // incluir 'total' en el UPDATE y parámetros en orden correcto (último parámetro es id_ingreso)
-        String sql="update ingreso_almacen set fecha_ingreso=?, proveedor=?, factura_proveedor=?, total=? where id_ingreso=?";
+        String sql="update ingresos_almacen set fecha_ingreso=?, proveedor=?, factura_proveedor=?, total=? where id_ingreso=?";
         try{
             con = cn.getConnection();
             ps=con.prepareStatement(sql);
@@ -516,7 +534,7 @@ ResultSet rs;
      @DELETE
      @Path("/EliminarA/{id}")
      public String EliminarI(@PathParam("id") String id){
-         String sql="delete from ingreso_almacen where id_ingreso=?";
+         String sql="delete from ingresos_almacen where id_ingreso=?";
          try{
              con = cn.getConnection();
              ps=con.prepareStatement(sql);
@@ -533,7 +551,7 @@ ResultSet rs;
      @Path("/ConsultarxA/{id}")
      public List<ingresos_almacen> ConsultarxI(@PathParam("id") String id){
          List<ingresos_almacen> Lista = new ArrayList<ingresos_almacen>();
-         String sql = "select * from ingreso_almacen where id_ingreso=?";
+         String sql = "select * from ingresos_almacen where id_ingreso=?";
          try {
              con = cn.getConnection();
              ps = con.prepareStatement(sql);
@@ -648,29 +666,30 @@ ResultSet rs;
     
     @GET 
     @Path("/ConsultarxIN/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
     public List<detalle_ingreso> ConsultarxDI(@PathParam("id") String id){
         List<detalle_ingreso> Lista = new ArrayList<detalle_ingreso>();
-        String sql = "select * from detalle_ingreso where id_detalle=?";
-        try {
-            con = cn.getConnection();
-            ps = con.prepareStatement(sql);
-            ps.setString(1, id);
-            rs = ps.executeQuery();
-            while ( rs.next()) {
-                detalle_ingreso d = new detalle_ingreso();
-                d.setId_detalle(rs.getInt("id_detalle"));
-                d.setId_ingreso(rs.getInt("id_ingreso"));
-                d.setId_producto(rs.getInt("id_producto"));
-                d.setCantidad(rs.getInt("cantidad"));
-                d.setPrecio_compra(rs.getFloat("precio_compra"));
-                Lista.add(d);
-                
-                
-            }
-        } catch (Exception e) {
-        }
-        return Lista;
-    }
+        // Filtrar por id_ingreso para obtener todos los detalles pertenecientes a ese ingreso
+        String sql = "SELECT id_detalle, id_ingreso, id_producto, cantidad, precio_compra FROM detalle_ingreso WHERE id_ingreso = ?";
+         try {
+             con = cn.getConnection();
+             ps = con.prepareStatement(sql);
+             ps.setString(1, id);
+             rs = ps.executeQuery();
+             while (rs.next()) {
+                 detalle_ingreso d = new detalle_ingreso();
+                 d.setId_detalle(rs.getInt("id_detalle"));
+                 d.setId_ingreso(rs.getInt("id_ingreso"));
+                 d.setId_producto(rs.getInt("id_producto"));
+                 d.setCantidad(rs.getInt("cantidad"));
+                 d.setPrecio_compra(rs.getFloat("precio_compra"));
+                 Lista.add(d);
+             }
+         } catch (Exception e) {
+             System.out.println("Error al listar detalle_ingreso por id_ingreso: " + e.getMessage());
+         }
+         return Lista;
+     }
     
     
     // --- NUEVO: detalle de factura ---
@@ -758,55 +777,51 @@ ResultSet rs;
     @Path("/agregarINMovimiento")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_PLAIN)
-    public String agregarDIConTipo(@QueryParam("tipo") String tipo, detalle_ingreso d){
-        // tipo esperado: "entrada" (aumenta stock) o "salida" (disminuye stock)
-        String sql="insert into detalle_ingreso(id_detalle,id_ingreso,id_producto,cantidad,precio_compra) values(?,?,?,?,?)";
-        try{
+    public String agregarDIConTipo(detalle_ingreso d){
+        System.out.println("Recibiendo detalle con id_ingreso: " + d.getId_ingreso()); // Debug
+        
+        // Primero verificar que existe el ingreso
+        try {
             con = cn.getConnection();
-            ps=con.prepareStatement(sql);
-            ps.setInt(1, d.getId_detalle());
-            ps.setInt(2, d.getId_ingreso());
-            ps.setInt(3, d.getId_producto());
-            ps.setInt(4, d.getCantidad());
-            ps.setFloat(5, d.getPrecio_compra());
+            PreparedStatement psCheck = con.prepareStatement("SELECT id_ingreso FROM ingresos_almacen WHERE id_ingreso = ?");
+            psCheck.setInt(1, d.getId_ingreso());
+            ResultSet rsCheck = psCheck.executeQuery();
+            if (!rsCheck.next()) {
+                return "Error: El ingreso #" + d.getId_ingreso() + " no existe";
+            }
+            rsCheck.close();
+            psCheck.close();
+            
+            // Si existe, proceder con la inserción
+            String sql = "insert into detalle_ingreso(id_ingreso,id_producto,cantidad,precio_compra) values(?,?,?,?)";
+            ps = con.prepareStatement(sql);
+            ps.setInt(1, d.getId_ingreso());
+            ps.setInt(2, d.getId_producto());
+            ps.setInt(3, d.getCantidad());
+            ps.setFloat(4, d.getPrecio_compra());
             ps.executeUpdate();
 
-            // ajustar existencia según tipo
-            String updProd;
-            if(tipo != null && tipo.equalsIgnoreCase("salida")){
-                updProd = "UPDATE productos SET existencia = existencia - ? WHERE id_producto = ?";
-            } else {
-                // por defecto, entrada aumenta stock
-                updProd = "UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?";
-            }
-            PreparedStatement psUpd = con.prepareStatement(updProd);
+            // Actualizar stock
+            PreparedStatement psUpd = con.prepareStatement(
+                "UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?");
             psUpd.setInt(1, d.getCantidad());
             psUpd.setInt(2, d.getId_producto());
             psUpd.executeUpdate();
             psUpd.close();
 
-            // actualizar total en ingreso_almacen (sumando o restando subtotal)
+            // Actualizar total
             float subtotal = d.getPrecio_compra() * d.getCantidad();
-            PreparedStatement psSel = con.prepareStatement("SELECT total FROM ingreso_almacen WHERE id_ingreso = ?");
-            psSel.setInt(1, d.getId_ingreso());
-            ResultSet rsSel = psSel.executeQuery();
-            float currTotal = 0f;
-            if(rsSel.next()){
-                currTotal = rsSel.getFloat("total");
-            }
-            rsSel.close();
-            psSel.close();
-
-            float newTotal = currTotal + (tipo != null && tipo.equalsIgnoreCase("salida") ? -subtotal : subtotal);
-            PreparedStatement psUpdTotal = con.prepareStatement("UPDATE ingreso_almacen SET total = ? WHERE id_ingreso = ?");
-            psUpdTotal.setFloat(1, newTotal);
+            PreparedStatement psUpdTotal = con.prepareStatement(
+                "UPDATE ingresos_almacen SET total = total + ? WHERE id_ingreso = ?");
+            psUpdTotal.setFloat(1, subtotal);
             psUpdTotal.setInt(2, d.getId_ingreso());
             psUpdTotal.executeUpdate();
             psUpdTotal.close();
 
-            return "Insercion detalle ingreso realizada con exito";
+            return "Detalle agregado exitosamente al ingreso #" + d.getId_ingreso();
         }catch(Exception e){
-             return "Insercion detalle ingreso fallida "+e.getMessage();
+            System.out.println("Error en agregarDIConTipo: " + e.getMessage()); // Debug
+            return "Error al registrar detalle: " + e.getMessage();
         }
     }
 
