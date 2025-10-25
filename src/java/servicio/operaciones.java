@@ -248,14 +248,39 @@ ResultSet rs;
     @Path("/eliminarProducto/{id}")
     @Produces(MediaType.TEXT_PLAIN)
     public String eliminarProd(@PathParam("id") int id) {
-        String sql = "DELETE FROM productos WHERE id_producto=?";
         try {
             con = cn.getConnection();
-            ps = con.prepareStatement(sql);
-            ps.setInt(1, id);
-            ps.executeUpdate();
-            return "Producto eliminado con éxito";
+            con.setAutoCommit(false);
+
+            // borrar primero los detalles de factura que apunten al producto
+            PreparedStatement p1 = con.prepareStatement("DELETE FROM detalle_factura WHERE id_producto = ?");
+            p1.setInt(1, id);
+            int delDF = p1.executeUpdate();
+            p1.close();
+
+            // borrar primero los detalles de ingreso que apunten al producto
+            PreparedStatement p2 = con.prepareStatement("DELETE FROM detalle_ingreso WHERE id_producto = ?");
+            p2.setInt(1, id);
+            int delDI = p2.executeUpdate();
+            p2.close();
+
+            // ahora borrar el producto
+            PreparedStatement p3 = con.prepareStatement("DELETE FROM productos WHERE id_producto = ?");
+            p3.setInt(1, id);
+            int delP = p3.executeUpdate();
+            p3.close();
+
+            con.commit();
+            con.setAutoCommit(true);
+
+            if (delP > 0) {
+                return "Producto eliminado con éxito. Detalles de factura eliminados: " + delDF + ", detalles de ingreso eliminados: " + delDI;
+            } else {
+                return "No se encontró el producto. Operación abortada. (Detalles eliminados: " + delDF + ", " + delDI + ")";
+            }
         } catch (Exception e) {
+            try { if (con != null) con.rollback(); } catch (Exception ex) { /* ignore */ }
+            try { if (con != null) con.setAutoCommit(true); } catch (Exception ex) { /* ignore */ }
             return "Error al eliminar producto: " + e.getMessage();
         }
     }
