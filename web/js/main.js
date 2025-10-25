@@ -348,11 +348,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Funciones para cargar detalles específicos
+    // --- Detalles ---
     function loadDetalleFactura(idFactura) {
         fetchJson(apiBase + 'listaDetalleFactura/' + idFactura)
             .then(function(detalles){
-                var tbody = document.getElementById('detalle-factura').querySelector('tbody');
+                var tbody = document.getElementById('detalles-factura-tbody');
                 if(!tbody) return;
                 
                 tbody.innerHTML = '';
@@ -367,9 +367,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         + '<td>$' + (d.precio || 0).toFixed(2) + '</td>'
                         + '<td>$' + ((d.cantidad * d.precio) || 0).toFixed(2) + '</td>'
                         + '<td>'
-                        + '<button class="btn btn-danger btn-delete-detalle" data-id="'+(d.id_detalle||'')+'">Eliminar</button>'
+                        + '<button class="btn btn-danger btn-delete-detalle-fact" data-id="'+(d.id_detalle||'')+'" data-fact="'+(idFactura||'')+'">Eliminar</button>'
                         + '</td>';
                     tbody.appendChild(tr);
+                });
+                // attach delete handlers for factura detalle
+                Array.prototype.slice.call(tbody.querySelectorAll('.btn-delete-detalle-fact')).forEach(function(b){
+                    b.addEventListener('click', function(){
+                        var id = this.getAttribute('data-id');
+                        var idFact = this.getAttribute('data-fact');
+                        if(!id) return;
+                        if(confirm('Eliminar detalle #' + id + ' ?')) {
+                            deleteReq(apiBase + 'EliminarDF/' + id)
+                                .then(function(res){
+                                    alert(res);
+                                    // refrescar detalles y facturas
+                                    loadDetalleFactura(parseInt(idFact));
+                                    fetchFacturas();
+                                })
+                                .catch(function(err){ alert('Error: '+err.message); });
+                        }
+                    });
                 });
             })
             .catch(function(err){ console.error('Error cargando detalles de factura:', err); });
@@ -393,9 +411,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         + '<td>$' + (d.precio_compra || 0).toFixed(2) + '</td>'
                         + '<td>$' + ((d.cantidad * d.precio_compra) || 0).toFixed(2) + '</td>'
                         + '<td>'
-                        + '<button class="btn btn-danger btn-delete-detalle" data-id="'+(d.id_detalle||'')+'">Eliminar</button>'
+                        + '<button class="btn btn-danger btn-delete-detalle-ing" data-id="'+(d.id_detalle||'')+'" data-ing="'+(idIngreso||'')+'">Eliminar</button>'
                         + '</td>';
                     tbody.appendChild(tr);
+                });
+                // attach delete handlers for ingreso detalle
+                Array.prototype.slice.call(tbody.querySelectorAll('.btn-delete-detalle-ing')).forEach(function(b){
+                    b.addEventListener('click', function(){
+                        var id = this.getAttribute('data-id');
+                        var idIng = this.getAttribute('data-ing');
+                        if(!id) return;
+                        if(confirm('Eliminar detalle #' + id + ' ?')) {
+                            deleteReq(apiBase + 'EliminarIN/' + id)
+                                .then(function(res){
+                                    alert(res);
+                                    // refrescar detalles y ingresos
+                                    loadDetalleIngreso(parseInt(idIng));
+                                    fetchIngresos();
+                                    fetchProducts();
+                                })
+                                .catch(function(err){ alert('Error: '+err.message); });
+                        }
+                    });
                 });
             })
             .catch(function(err){ console.error('Error cargando detalles de ingreso:', err); });

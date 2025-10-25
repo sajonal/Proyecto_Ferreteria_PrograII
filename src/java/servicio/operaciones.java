@@ -392,13 +392,25 @@ ResultSet rs;
     @Path("/eliminarFactura/{id}")
     @Produces(MediaType.TEXT_PLAIN)
     public String eliminarFact(@PathParam("id") int id) {
-        String sql = "DELETE FROM facturas WHERE id_factura=?";
         try {
             con = cn.getConnection();
-            ps = con.prepareStatement(sql);
-            ps.setInt(1, id);
-            ps.executeUpdate();
-            return "Factura eliminada con éxito";
+            // borrar detalles primero
+            PreparedStatement psDelDet = con.prepareStatement("DELETE FROM detalle_factura WHERE id_factura = ?");
+            psDelDet.setInt(1, id);
+            psDelDet.executeUpdate();
+            psDelDet.close();
+
+            // borrar factura
+            PreparedStatement psDelFact = con.prepareStatement("DELETE FROM facturas WHERE id_factura = ?");
+            psDelFact.setInt(1, id);
+            int affected = psDelFact.executeUpdate();
+            psDelFact.close();
+
+            if (affected > 0) {
+                return "Factura y sus detalles eliminados con éxito";
+            } else {
+                return "No se encontró la factura a eliminar";
+            }
         } catch (Exception e) {
             return "Error al eliminar factura: " + e.getMessage();
         }
@@ -534,13 +546,25 @@ ResultSet rs;
      @DELETE
      @Path("/EliminarA/{id}")
      public String EliminarI(@PathParam("id") String id){
-         String sql="delete from ingresos_almacen where id_ingreso=?";
          try{
              con = cn.getConnection();
-             ps=con.prepareStatement(sql);
-             ps.setString(1, id);
-             ps.executeUpdate();
-             return "Eliminacion realizada con exito";
+             // borrar detalles del ingreso primero
+             PreparedStatement psDelDet = con.prepareStatement("DELETE FROM detalle_ingreso WHERE id_ingreso = ?");
+             psDelDet.setString(1, id);
+             psDelDet.executeUpdate();
+             psDelDet.close();
+
+             // luego borrar el ingreso
+             PreparedStatement psDel = con.prepareStatement("DELETE FROM ingresos_almacen WHERE id_ingreso = ?");
+             psDel.setString(1, id);
+             int affected = psDel.executeUpdate();
+             psDel.close();
+
+             if (affected > 0) {
+                 return "Ingreso y sus detalles eliminados con éxito";
+             } else {
+                 return "No se encontró el ingreso a eliminar";
+             }
          }catch(Exception e){
               return "Eliminacion fallida "+e.getMessage();
          }
@@ -846,5 +870,27 @@ ResultSet rs;
             System.out.println("Error listando clientes: " + e.getMessage());
         }
         return lista;
+    }
+    
+    // eliminar una línea de detalle de factura por id_detalle
+    @DELETE
+    @Path("/EliminarDF/{id}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String EliminarDF(@PathParam("id") int id){
+        String sql="DELETE FROM detalle_factura WHERE id_detalle=?";
+        try{
+            con = cn.getConnection();
+            PreparedStatement psd = con.prepareStatement(sql);
+            psd.setInt(1, id);
+            int affected = psd.executeUpdate();
+            psd.close();
+            if (affected > 0) {
+                return "Detalle de factura eliminado con éxito";
+            } else {
+                return "No se encontró el detalle de factura";
+            }
+        }catch(Exception e){
+             return "Eliminacion fallida "+e.getMessage();
+        }
     }
 }
